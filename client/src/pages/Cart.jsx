@@ -1,32 +1,116 @@
 import { useEffect, useState } from "react";
 import { useAppContext } from "../context/AppContext";
 import { assets, dummyAddress } from "../assets/assets";
+import toast from "react-hot-toast";
 
 const Cart = () => {
-    const { products, currency, getCartAmount, getCartCount, updateCartItem, removeFromCart, cartItems, navigate } = useAppContext()
+    const { products, currency, getCartAmount, getCartCount, updateCartItem, removeFromCart, cartItems, navigate, axios, user, setCartItems } = useAppContext()
     const [cartArray, setCartArray] = useState([])
-    const [addresses, setAddresses] = useState(dummyAddress)
+    const [addresses, setAddresses] = useState([])
     const [showAddress, setShowAddress] = useState(false)
-    const [selectedAddress, setSelectedAddress] = useState(dummyAddress[0])
+    const [selectedAddress, setSelectedAddress] = useState(null)
     const [paymentOption, setPaymentOption] = useState("COD")
 
+    // const getCart = () => {
+    //     let tempArray = []
+    //     for (const key in cartItems) {
+    //         const product = products.find((item) => item._id === key)
+    //         product.quantity = cartItems[key]
+    //         tempArray.push(product)
+    //     }
+    //     setCartArray(tempArray)
+    // }
+    // CHATGPT
     const getCart = () => {
-        let tempArray = []
+        let tempArray = [];
+    
         for (const key in cartItems) {
-            const product = products.find((item) => item._id === key)
-            product.quantity = cartItems[key]
-            tempArray.push(product)
+            const product = products.find(item => item._id === key);
+    
+            // ✅ GUARD
+            if (!product) continue;
+    
+            tempArray.push({
+                ...product,
+                quantity: cartItems[key]
+            });
         }
-        setCartArray(tempArray)
+    
+        setCartArray(tempArray);
+    };
+    
+
+    const getUserAddress = async()=>{
+        try {
+            const {data} = await axios.get('/api/address/get')
+            if (data.success) {
+                setAddresses(data.addresses)
+                if (data.addresses.length > 0) {
+                    setSelectedAddress(data.addresses[0])
+                }
+            }else{
+                toast.error(data.message)
+            }
+        } catch (error) {
+            toast.error(error.message)
+        }
     }
     const placeOrder = async ()=> {
-
+        try {
+            if (!selectedAddress) {
+                return toast.error("Please select an address")
+            }
+            // Place order with COD
+            if (paymentOption === "COD") {
+                // const {data} = await axios.post('/api/order/cod', {
+                //     userId: user._id,
+                //     items: cartArray.map(item=> ({product: item._id, quantity: item.quantity})),
+                //     address: selectedAddress._id
+                // })
+                // CHATGPT
+                const { data } = await axios.post('/api/order/cod', {
+                    items: cartArray.map(item => ({
+                        product: item._id,
+                        quantity: item.quantity
+                    })),
+                    address: selectedAddress._id
+                });
+                
+                if (data.success) {
+                    toast.success(data.success)
+                    setCartItems({})
+                    navigate('/my-orders')
+                }else{
+                    toast.error(data.success)
+                }
+            } // place order with stripe
+            else{
+                const {data} = await axios.post('/api/order/stripe', {
+                    userId: user._id,
+                    items: cartArray.map(item=> ({product: item._id, quantity: item.quantity})),
+                    address: selectedAddress._id
+                })
+                if (data.success) {
+                    window.location.replace(data.url)
+                }else{
+                    toast.error(data.success)
+                }
+            }
+        } catch (error) {
+            toast.error(error.message)
+        }
     }
     useEffect(() => {
         if (products.length > 0 && cartItems) {
             getCart()
         }
     }, [products, cartItems])
+
+    useEffect(()=>{
+        if(user){
+            getUserAddress()
+        }
+    },[user])
 
     return products.length > 0 && cartItems ? (
         <div className="flex flex-col md:flex-row mt-16">

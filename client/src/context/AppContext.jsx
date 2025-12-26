@@ -21,6 +21,8 @@ export const AppContextProvider = ({children})=>{
     const [products, setProducts] = useState([]);
     const [cartItems, setCartItems] = useState({});
     const [searchQuery, setSearchQuery] = useState({});
+    // const [cartLoaded, setCartLoaded] = useState(false);
+
 
     //Fetch seller status means after logging and refreshing it will not log out
     const fetchSeller = async()=>{
@@ -35,6 +37,18 @@ export const AppContextProvider = ({children})=>{
             setIsSeller(false)
         }
     }
+     // Fetch User Auth status, User Data and cart Items
+     const fetchUser = async()=>{
+        try {
+            const{data} = await axios.get('/api/user/is-auth')
+            if (data.success) {
+                setUser(data.user)
+                setCartItems(data.user.cartItems)
+            }
+        } catch (error) {
+            setUser(null)
+        }
+     }
 
     //Fetch all the product
     const fetchProducts = async ()=>{
@@ -91,23 +105,61 @@ export const AppContextProvider = ({children})=>{
         return totalCount;
     }
     // Get cart Total amount
+    // const getCartAmount = () => {
+    //     let totalAmount = 0;
+    //     for(const items in cartItems){
+    //         let itemInfo = products.find((product)=> product._id === items)
+    //         if (cartItems[items] > 0) {
+    //             totalAmount += itemInfo.offerPrice * cartItems[items]
+    //         }
+    //     }
+    //     return Math.floor(totalAmount * 100) / 100;
+    // }
+    // CHATGPT
     const getCartAmount = () => {
         let totalAmount = 0;
-        for(const items in cartItems){
-            let itemInfo = products.find((product)=> product._id === items)
-            if (cartItems[items] > 0) {
-                totalAmount += itemInfo.offerPrice * cartItems[items]
-            }
+    
+        for (const itemId in cartItems) {
+            const itemInfo = products.find(
+                (product) => product._id === itemId
+            );
+    
+            // ✅ CRITICAL GUARD
+            if (!itemInfo) continue;
+    
+            totalAmount += itemInfo.offerPrice * cartItems[itemId];
         }
+    
         return Math.floor(totalAmount * 100) / 100;
-    }
+    };
+    
 
     useEffect(()=>{
+        fetchUser()
         fetchSeller()
         fetchProducts()
     },[])
 
-    const value = {navigate, user, setUser, isSeller, setIsSeller,showUserLogin, setShowUserLogin, products, currency, addToCart, updateCartItem, removeFromCart, cartItems, searchQuery, setSearchQuery, getCartAmount, getCartCount, axios, fetchProducts
+    // Update Database cart items
+    useEffect(()=>{
+        const updateCart = async ()=>{
+            try {
+                const {data} = await axios.post('/api/cart/update', {cartItems})
+
+                if (!data.success) {
+                    toast.error(data.message)
+                }
+            } catch (error) {
+                toast.error(error.message)
+            }
+        }
+
+        if(user){
+            updateCart()
+        }
+    },[cartItems])
+
+    const value = {navigate, user, setUser, isSeller, setIsSeller,showUserLogin, setShowUserLogin, products, currency, addToCart, updateCartItem, removeFromCart, cartItems, searchQuery, setSearchQuery, getCartAmount, getCartCount, axios, fetchProducts, setCartItems
     }
 
     return <AppContext.Provider value={value}>

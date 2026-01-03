@@ -2,7 +2,9 @@
 .DS_Store
 
 # dependencies
-node_modules/
+node_modules
+
 
 # environment variables
 .env
+server/.env
